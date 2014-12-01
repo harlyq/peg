@@ -1,3 +1,8 @@
+var options = {
+    verbose: false,
+    useCache: false
+};
+
 function peg(str) {
     if (typeof str !== 'string')
         return 'error: input parameter is not a string - ' + str;
@@ -478,6 +483,67 @@ function peg(str) {
             }]
     };
 
+    define.peg$CodeBlock = {};
+    define.peg$CodeBlock.type = SEQUENCE;
+    define.peg$CodeBlock.debug = 'CodeBlock';
+    define.peg$CodeBlock.children = [
+        {
+            type: LITERAL,
+            value: '{'
+        }, {
+            type: ZERO_OR_MORE,
+            child: {
+                type: SEQUENCE,
+                children: [
+                    {
+                        type: NOT,
+                        child: {
+                            type: SET,
+                            chars: '{}'
+                        }
+                    }, {
+                        type: ANY_CHAR
+                    }]
+            }
+        }, {
+            type: ZERO_OR_MORE,
+            child: {
+                type: DEFINITION,
+                defn: define.peg$CodeBlock
+            }
+        }, {
+            type: ZERO_OR_MORE,
+            children: [
+                {
+                    type: NOT,
+                    child: {
+                        type: SET,
+                        chars: '{}'
+                    }
+                }, {
+                    type: ANY_CHAR
+                }]
+        }, {
+            type: LITERAL,
+            value: '}'
+        }];
+
+    define.peg$Reference = {
+        type: SEQUENCE,
+        debug: 'Reference',
+        children: [
+            {
+                type: DEFINITION,
+                defn: define.peg$Identifier
+            }, {
+                type: LITERAL,
+                value: ':'
+            }, {
+                type: DEFINITION,
+                defn: define.peg$Spacing
+            }]
+    };
+
     define.peg$Expression = {}; // pre-declare
 
     define.peg$Primary = {
@@ -573,12 +639,28 @@ function peg(str) {
     };
 
     define.peg$Sequence = {
-        type: ZERO_OR_MORE,
+        type: SEQUENCE,
         debug: 'Sequence',
-        child: {
-            type: DEFINITION,
-            defn: define.peg$Prefix
-        }
+        children: [
+            {
+                type: OPTION,
+                child: {
+                    type: DEFINITION,
+                    defn: define.peg$Reference
+                }
+            }, {
+                type: ZERO_OR_MORE,
+                child: {
+                    type: DEFINITION,
+                    defn: define.peg$Prefix
+                }
+            }, {
+                type: OPTION,
+                child: {
+                    type: DEFINITION,
+                    defn: define.peg$CodeBlock
+                }
+            }]
     };
 
     define.peg$Expression.type = SEQUENCE;
@@ -638,13 +720,18 @@ function peg(str) {
             }]
     };
 
-    var options = {
-        verbose: true
-    };
-
-    var best = 0, bestError = '';
+    var best = 0, bestError = '', cache = [];
 
     function parse(str, i, definition) {
+        // if (options.useCache) {
+        //     var cachedResults = cache[i];
+        //     if (cachedResults) {
+        //         for (var j = 0; j < cachedResults.length; ++j) {
+        //             if (cachedResults[j].definition === definition)
+        //                 return cachedResults[j].result;
+        //         }
+        //     }
+        // }
         var result = parseInternal(str, i, definition);
         if (result) {
             if (result.end > best) {
@@ -655,6 +742,16 @@ function peg(str) {
             bestError = definition.error;
         }
 
+        // if (options.useCache) {
+        //     var entry = {
+        //         definition: definition,
+        //         result: result
+        //     };
+        //     if (!cache[i])
+        //         cache[i] = [entry];
+        //     else
+        //         cache[i].push(entry);
+        // }
         return result;
     }
 
