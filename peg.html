@@ -9,12 +9,17 @@
         document.getElementById("parse").addEventListener("click", function() {
             peg(grammar.value);
         });
+
+        grammarElem.value = "\
+Comment <- '(*' comment:(Comment / ! '*)' .)* '*)' { return comment; } \n\
+Definition <- param: 'a' 'b' 'c' { return param; } \
+        ";
     });
     </script>
 </head>
 
 <body>
-    <textarea id="grammar" cols="60" rows="20">Comment &lt;- '(*' (Comment / ! '*)' .)* '*) '</textarea>
+    <textarea id="grammar" cols="60" rows="20"></textarea>
     <div></div>
     <button id="parse">Parse</button>
 </body>

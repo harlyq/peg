@@ -2,7 +2,7 @@
 Grammar <- Spacing Definition+ EndOfFile
 Definition <- Identifier LEFTARROW Expression
 Expression <- Sequence (SLASH Sequence)*
-Sequence <- Reference? Prefix* CodeBlock?
+Sequence <- (Parameter? Prefix)* CodeBlock?
 Prefix <- (AND / NOT)? Suffix
 Suffix <- Primary (QUESTION / STAR / PLUS)?
 Primary <- Identifier !LEFTARROW
@@ -10,7 +10,7 @@ Primary <- Identifier !LEFTARROW
 / Literal / Class / DOT
 
 # Lexical syntax
-Reference <- Identifier ':' Spacing
+Parameter <- Identifier ':' Spacing
 CodeBlock <- '{' (![{}] .)* CodeBlock* (![{}] .)* '}' Spacing
 Identifier <- IdentStart IdentCont* Spacing
 IdentStart <- [a-zA-Z_]

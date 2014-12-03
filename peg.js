@@ -11,21 +11,27 @@ function peg(str) {
         return 'error: input string is empty';
 
     // note: ranges are auto expanded in the set
-    var DEFINITION = 1, SEQUENCE = 2, OR = 3, TEST = 4, OPTION = 5, ATLEAST_ONE = 6, ZERO_OR_MORE = 7, NOT = 8, LITERAL = 9, SET = 10, ANY_CHAR = 12;
+    var UNKNOWN = 'unknown', DEFINITION = 'definition', SEQUENCE = 'sequence', OR = 'or', TEST = 'test', OPTION = 'option', ATLEAST_ONE = 'at least one', ZERO_OR_MORE = 'zero or more', NOT = 'not', LITERAL = 'literal', SET = 'set', ANY_CHAR = 'any char';
 
-    // var extend = function(base, other) {
-    //     if (typeof other !== 'object')
-    //         return other;
-    //     for (var key in other) {
-    //         var value = other[key];
-    //         if (typeof value === 'object') {
-    //             base[key] = Array.isArray(value) ? [] : {};
-    //             extend(base[key], value);
-    //         } else {
-    //             base[key] = value;
-    //         }
-    //     }
-    // }
+    var stringToType = function (str) {
+        switch (str.trim()) {
+            case '*':
+                return ZERO_OR_MORE;
+            case '+':
+                return ATLEAST_ONE;
+            case '/':
+                return OR;
+            case '?':
+                return OPTION;
+            case '&':
+                return TEST;
+            case '!':
+                return NOT;
+        }
+        debugger;
+        return UNKNOWN;
+    };
+
     var define = {};
 
     define.peg$EndOfFile = {
@@ -138,7 +144,12 @@ function peg(str) {
             }, {
                 type: DEFINITION,
                 defn: define.peg$Spacing
-            }]
+            }],
+        action: function () {
+            return {
+                type: ANY_CHAR
+            };
+        }
     };
 
     define.peg$CLOSE = {
@@ -332,14 +343,23 @@ function peg(str) {
                 children: [
                     {
                         type: DEFINITION,
+                        param: 'start',
                         defn: define.peg$Char
                     }, {
                         type: LITERAL,
                         value: '-'
                     }, {
                         type: DEFINITION,
+                        param: 'end',
                         defn: define.peg$Char
-                    }]
+                    }],
+                action: function (start, end) {
+                    // expand the range
+                    var str = '';
+                    for (var i = start.charCodeAt(0); i < end.charCodeAt(0); ++i)
+                        str += String.fromCharCode(i);
+                    return str;
+                }
             }, {
                 type: DEFINITION,
                 defn: define.peg$Char
@@ -355,6 +375,7 @@ function peg(str) {
                 value: '['
             }, {
                 type: ZERO_OR_MORE,
+                param: 'chars',
                 child: {
                     type: SEQUENCE,
                     children: [
@@ -375,7 +396,13 @@ function peg(str) {
             }, {
                 type: DEFINITION,
                 defn: define.peg$Spacing
-            }]
+            }],
+        action: function (chars) {
+            return {
+                type: SET,
+                chars: chars.join('')
+            };
+        }
     };
 
     define.peg$Literal = {
@@ -390,6 +417,7 @@ function peg(str) {
                         value: '\''
                     }, {
                         type: ZERO_OR_MORE,
+                        param: 'chars',
                         child: {
                             type: SEQUENCE,
                             children: [
@@ -411,7 +439,13 @@ function peg(str) {
                     }, {
                         type: DEFINITION,
                         defn: define.peg$Spacing
-                    }]
+                    }],
+                action: function (chars) {
+                    return {
+                        type: LITERAL,
+                        value: chars
+                    };
+                }
             }, {
                 type: SEQUENCE,
                 children: [
@@ -420,6 +454,7 @@ function peg(str) {
                         value: '"'
                     }, {
                         type: ZERO_OR_MORE,
+                        param: 'chars',
                         child: {
                             type: SEQUENCE,
                             children: [
@@ -441,7 +476,13 @@ function peg(str) {
                     }, {
                         type: DEFINITION,
                         defn: define.peg$Spacing
-                    }]
+                    }],
+                action: function (chars) {
+                    return {
+                        type: LITERAL,
+                        value: "'" + chars + "'"
+                    };
+                }
             }]
     };
 
@@ -470,9 +511,11 @@ function peg(str) {
         children: [
             {
                 type: DEFINITION,
+                param: 'first',
                 defn: define.peg$IdentStart
             }, {
                 type: ZERO_OR_MORE,
+                param: 'rest',
                 child: {
                     type: DEFINITION,
                     defn: define.peg$IdentCont
@@ -480,7 +523,10 @@ function peg(str) {
             }, {
                 type: DEFINITION,
                 defn: define.peg$Spacing
-            }]
+            }],
+        action: function (first, rest) {
+            return first + rest;
+        }
     };
 
     define.peg$CodeBlock = {};
@@ -492,6 +538,7 @@ function peg(str) {
             value: '{'
         }, {
             type: ZERO_OR_MORE,
+            param: 'codeparts',
             child: {
                 type: SEQUENCE,
                 children: [
@@ -507,33 +554,34 @@ function peg(str) {
             }
         }, {
             type: ZERO_OR_MORE,
+            param: 'nestedcode',
             child: {
                 type: DEFINITION,
                 defn: define.peg$CodeBlock
             }
-        }, {
-            type: ZERO_OR_MORE,
-            children: [
-                {
-                    type: NOT,
-                    child: {
-                        type: SET,
-                        chars: '{}'
-                    }
-                }, {
-                    type: ANY_CHAR
-                }]
-        }, {
+        },
+        {
             type: LITERAL,
             value: '}'
-        }];
+        }, {
+            type: DEFINITION,
+            defn: define.peg$Spacing
+        }
+    ];
+    define.peg$CodeBlock.action = function (codeparts, nestedcode) {
+        if (!nestedcode)
+            return codeparts;
+        else
+            return codeparts + nestedcode;
+    };
 
-    define.peg$Reference = {
+    define.peg$Parameter = {
         type: SEQUENCE,
-        debug: 'Reference',
+        debug: 'Parameter',
         children: [
             {
                 type: DEFINITION,
+                param: 'param',
                 defn: define.peg$Identifier
             }, {
                 type: LITERAL,
@@ -541,7 +589,10 @@ function peg(str) {
             }, {
                 type: DEFINITION,
                 defn: define.peg$Spacing
-            }]
+            }],
+        action: function (param) {
+            return param.trim();
+        }
     };
 
     define.peg$Expression = {}; // pre-declare
@@ -556,6 +607,7 @@ function peg(str) {
                 children: [
                     {
                         type: DEFINITION,
+                        param: 'identifier',
                         defn: define.peg$Identifier
                     }, {
                         type: NOT,
@@ -563,7 +615,13 @@ function peg(str) {
                             type: DEFINITION,
                             defn: define.peg$LEFTARROW
                         }
-                    }]
+                    }],
+                action: function (identifier) {
+                    return {
+                        type: DEFINITION,
+                        defn: identifier.trim()
+                    };
+                }
             }, {
                 type: SEQUENCE,
                 children: [
@@ -572,11 +630,15 @@ function peg(str) {
                         defn: define.peg$OPEN
                     }, {
                         type: DEFINITION,
+                        param: 'expression',
                         defn: define.peg$Expression
                     }, {
                         type: DEFINITION,
                         defn: define.peg$CLOSE
-                    }]
+                    }],
+                action: function (expression) {
+                    return expression;
+                }
             }, {
                 type: DEFINITION,
                 defn: define.peg$Literal
@@ -595,9 +657,11 @@ function peg(str) {
         children: [
             {
                 type: DEFINITION,
+                param: 'part',
                 defn: define.peg$Primary
             }, {
                 type: OPTION,
+                param: 'option',
                 child: {
                     type: OR,
                     children: [
@@ -612,7 +676,16 @@ function peg(str) {
                             defn: define.peg$PLUS
                         }]
                 }
-            }]
+            }],
+        action: function (part, option) {
+            if (option)
+                return {
+                    type: stringToType(option),
+                    child: part
+                };
+            else
+                return part;
+        }
     };
 
     define.peg$Prefix = {
@@ -621,6 +694,7 @@ function peg(str) {
         children: [
             {
                 type: OPTION,
+                param: 'option',
                 child: {
                     type: OR,
                     children: [
@@ -634,8 +708,18 @@ function peg(str) {
                 }
             }, {
                 type: DEFINITION,
+                param: 'part',
                 defn: define.peg$Suffix
-            }]
+            }],
+        action: function (option, part) {
+            if (option)
+                return {
+                    type: stringToType(option),
+                    child: part
+                };
+            else
+                return part;
+        }
     };
 
     define.peg$Sequence = {
@@ -643,24 +727,57 @@ function peg(str) {
         debug: 'Sequence',
         children: [
             {
-                type: OPTION,
-                child: {
-                    type: DEFINITION,
-                    defn: define.peg$Reference
-                }
-            }, {
                 type: ZERO_OR_MORE,
+                param: 'children',
                 child: {
-                    type: DEFINITION,
-                    defn: define.peg$Prefix
+                    type: SEQUENCE,
+                    children: [
+                        {
+                            type: OPTION,
+                            param: 'param',
+                            child: {
+                                type: DEFINITION,
+                                defn: define.peg$Parameter
+                            }
+                        }, {
+                            type: DEFINITION,
+                            param: 'expression',
+                            defn: define.peg$Prefix
+                        }],
+                    action: function (param, expression) {
+                        if (param)
+                            expression.param = param;
+
+                        return expression;
+                    }
                 }
             }, {
                 type: OPTION,
+                param: 'action',
                 child: {
                     type: DEFINITION,
                     defn: define.peg$CodeBlock
                 }
-            }]
+            }],
+        action: function (children, action) {
+            // TODO params
+            if (typeof children === 'undefined' || children.length === 0)
+                return undefined;
+
+            var definition;
+            if (children.length === 1)
+                definition = children[0];
+            else
+                definition = {
+                    type: SEQUENCE,
+                    children: children
+                };
+
+            if (action)
+                definition.action = action;
+
+            return definition;
+        }
     };
 
     define.peg$Expression.type = SEQUENCE;
@@ -668,21 +785,48 @@ function peg(str) {
     define.peg$Expression.children = [
         {
             type: DEFINITION,
+            param: 'first',
             defn: define.peg$Sequence
         }, {
             type: ZERO_OR_MORE,
+            param: 'rest',
             child: {
                 type: SEQUENCE,
+                param: 'parts',
                 children: [
                     {
                         type: DEFINITION,
                         defn: define.peg$SLASH
                     }, {
                         type: DEFINITION,
+                        param: 'part',
                         defn: define.peg$Sequence
-                    }]
+                    }],
+                action: function (part) {
+                    return part;
+                }
+            },
+            action: function (parts) {
+                if (typeof parts === 'undefined' || parts.length === 0)
+                    return undefined;
+                else if (parts.length > 1)
+                    return {
+                        type: OR,
+                        children: parts
+                    };
+                else if (parts.length == 1)
+                    return parts;
             }
         }];
+    define.peg$Expression.action = function (first, rest) {
+        if (first && !rest)
+            return first;
+        else if (first && rest)
+            return {
+                type: OR,
+                children: [].concat.apply(first, rest)
+            };
+    };
 
     define.peg$Definition = {
         type: SEQUENCE,
@@ -690,15 +834,22 @@ function peg(str) {
         children: [
             {
                 type: DEFINITION,
-                ref: 'identifier',
+                param: 'identifier',
                 defn: define.peg$Identifier
             }, {
                 type: DEFINITION,
                 defn: define.peg$LEFTARROW
             }, {
                 type: DEFINITION,
+                param: 'definition',
                 defn: define.peg$Expression
-            }]
+            }],
+        action: function (identifier, definition) {
+            definition.debug = identifier;
+
+            //define[identifier] = definition;
+            return definition;
+        }
     };
 
     define.peg$Grammar = {
@@ -710,6 +861,7 @@ function peg(str) {
                 defn: define.peg$Spacing
             }, {
                 type: ATLEAST_ONE,
+                param: 'definitions',
                 child: {
                     type: DEFINITION,
                     defn: define.peg$Definition
@@ -717,45 +869,60 @@ function peg(str) {
             }, {
                 type: DEFINITION,
                 defn: define.peg$EndOfFile
-            }]
+            }],
+        action: function (definitions) {
+            return definitions;
+        }
     };
 
     var best = 0, bestError = '', cache = [];
 
-    function parse(str, i, definition) {
-        // if (options.useCache) {
-        //     var cachedResults = cache[i];
-        //     if (cachedResults) {
-        //         for (var j = 0; j < cachedResults.length; ++j) {
-        //             if (cachedResults[j].definition === definition)
-        //                 return cachedResults[j].result;
-        //         }
-        //     }
-        // }
-        var result = parseInternal(str, i, definition);
-        if (result) {
-            if (result.end > best) {
-                bestError = '';
-                best = result.end;
-            }
-        } else if (!bestError && definition.error) {
-            bestError = definition.error;
-        }
+    // function parse(str, i, definition) {
+    //     // if (options.useCache) {
+    //     //     var cachedResults = cache[i];
+    //     //     if (cachedResults) {
+    //     //         for (var j = 0; j < cachedResults.length; ++j) {
+    //     //             if (cachedResults[j].definition === definition)
+    //     //                 return cachedResults[j].result;
+    //     //         }
+    //     //     }
+    //     // }
+    //     var info = parseInternal(str, i, definition);
+    //     if (info) {
+    //         if (info.end > best) {
+    //             bestError = '';
+    //             best = info.end;
+    //         }
+    //     } else if (!bestError && definition.error) {
+    //         bestError = definition.error;
+    //     }
+    //     // if (options.useCache) {
+    //     //     var entry = {
+    //     //         definition: definition,
+    //     //         result: result
+    //     //     };
+    //     //     if (!cache[i])
+    //     //         cache[i] = [entry];
+    //     //     else
+    //     //         cache[i].push(entry);
+    //     // }
+    //     return info;
+    // }
+    function applyParams(definition, params, results) {
+        if (typeof definition.action === 'function') {
+            return definition.action.apply(this, params);
+        } else {
+            var isStringArray = Array.isArray(results);
+            for (var i = 0; isStringArray && i < results.length; ++i)
+                isStringArray = typeof results[i] === 'string';
 
-        // if (options.useCache) {
-        //     var entry = {
-        //         definition: definition,
-        //         result: result
-        //     };
-        //     if (!cache[i])
-        //         cache[i] = [entry];
-        //     else
-        //         cache[i].push(entry);
-        // }
-        return result;
+            return isStringArray ? results.join('') : results;
+        }
     }
 
-    function parseInternal(str, i, definition) {
+    function parse(str, i, definition) {
+        var debugStr = str.substr(i, 20);
+
         if (!definition)
             debugger;
 
@@ -768,137 +935,235 @@ function peg(str) {
         if (definition.breakpoint)
             debugger;
 
+        var info;
+
         switch (definition.type) {
             case DEFINITION:
-                return parse(str, i, definition.defn);
+                info = parse(str, i, definition.defn);
+                break;
 
             case SEQUENCE:
                 var j = i;
-                var result = '';
-                for (var k = 0; k < definition.children.length; ++k) {
-                    var childResult = parse(str, j, definition.children[k]);
-                    if (!childResult)
-                        return undefined;
+                var result, params = [];
 
-                    j = childResult.end;
-                    if (childResult.result)
-                        result += childResult.result;
+                for (var k = 0; k < definition.children.length; ++k) {
+                    var childDefinition = definition.children[k];
+                    var childInfo = parse(str, j, childDefinition);
+
+                    if (!childInfo)
+                        break;
+
+                    // always push params, even when undefined, as order must be maintained
+                    if (childDefinition.param)
+                        params.push(childInfo.result);
+
+                    j = childInfo.end;
+                    if (childInfo.result) {
+                        if (!result)
+                            result = [];
+
+                        result.push(childInfo.result);
+                    }
                 }
 
-                return {
-                    start: i,
-                    end: j,
-                    result: result
-                };
+                if (k === definition.children.length)
+                    info = {
+                        start: i,
+                        end: j,
+                        result: applyParams(definition, params, result)
+                    };
+                break;
 
             case OR:
                 for (var k = 0; k < definition.children.length; ++k) {
-                    var childResult = parse(str, i, definition.children[k]);
-                    if (childResult)
-                        return childResult;
+                    var childInfo = parse(str, i, definition.children[k]);
+                    if (childInfo) {
+                        info = childInfo;
+                        break;
+                    }
                 }
-                return undefined;
-
                 break;
 
             case TEST:
-                var childResult = parse(str, i, definition.child);
+                var childInfo = parse(str, i, definition.child);
 
-                if (childResult)
-                    return {
+                if (childInfo)
+                    info = {
                         start: i,
                         end: i,
-                        result: childResult.result
+                        result: childInfo.result
                     };
-                else
-                    return undefined;
+                break;
 
             case OPTION:
-                var childResult = parse(str, i, definition.child);
+                var childInfo = parse(str, i, definition.child);
 
-                if (!childResult)
-                    return {
+                if (!childInfo)
+                    info = {
                         start: i,
                         end: i
                     };
                 else
-                    return childResult;
+                    info = childInfo;
+                break;
 
             case ATLEAST_ONE:
             case ZERO_OR_MORE:
-                var k = i;
+                var k = i, result, params = [], childDefinition = definition.child;
 
                 do {
-                    childResult = parse(str, k, definition.child);
-                    if (childResult)
-                        k = childResult.end;
-                } while(childResult);
+                    childInfo = parse(str, k, childDefinition);
 
-                if (k === i && definition.type === ATLEAST_ONE)
-                    return undefined;
+                    if (childInfo) {
+                        k = childInfo.end;
+                        if (!result)
+                            result = [];
 
-                return {
-                    start: i,
-                    end: k,
-                    result: str.substr(i, k - i)
-                };
+                        result.push(childInfo.result);
+                    }
+                } while(childInfo);
+
+                // each element in the params array represents a parameter, in this case there is
+                // only ever one parameter
+                if (childDefinition.param)
+                    params = [result];
+
+                if (k !== i || definition.type !== ATLEAST_ONE)
+                    info = {
+                        start: i,
+                        end: k,
+                        result: applyParams(definition, params, result)
+                    };
+                break;
 
             case NOT:
-                var childResult = parse(str, i, definition.child);
-                if (!childResult)
-                    return {
+                var childInfo = parse(str, i, definition.child);
+                if (!childInfo)
+                    info = {
                         start: i,
                         end: i
                     };
-                else
-                    return undefined;
+                break;
 
             case LITERAL:
                 var length = definition.value.length, literal = str.substr(i, length);
 
                 if (definition.value === literal)
-                    return {
+                    info = {
                         start: i,
                         end: i + length,
                         result: literal
                     };
-                else
-                    return undefined;
+                break;
 
             case SET:
                 var c = str[i];
                 if (c && definition.chars.indexOf(c) !== -1)
-                    return {
+                    info = {
                         start: i,
                         end: i + 1,
                         result: c
                     };
-                else
-                    return undefined;
+                break;
 
             case ANY_CHAR:
                 var c = str[i];
                 if (c)
-                    return {
+                    info = {
                         start: i,
                         end: i + 1,
                         result: c
                     };
-                else
-                    return undefined;
+                break;
+
+            default:
+                info = "error - unknown definition - " + definition;
         }
 
-        return "error - unknown definition - " + definition;
+        if (info) {
+            if (info.end > best) {
+                bestError = '';
+                best = info.end;
+            }
+        } else if (!bestError && definition.error) {
+            bestError = definition.error;
+        }
+
+        return info;
     }
 
     var initial = define.peg$Grammar;
 
-    var result = parse(str, 0, initial);
-    if (!result) {
+    var info = parse(str, 0, initial);
+    if (!info) {
         console.log('Error at - ' + str.substr(0, best));
         console.log(bestError);
         debugger;
     } else {
-        console.log('Success');
+        console.log('Success - ', definitionsToCode(info.result));
+    }
+
+    function definitionsToCode(definitions) {
+        var code = '';
+        for (var i = 0; i < definitions.length; ++i) {
+            code += structToCode(definitions[i]) + '\n\n';
+        }
+        return code;
+    }
+
+    // outputs a string of formatted code
+    function structToCode(definition, prefix) {
+        if (typeof prefix === "undefined") { prefix = ''; }
+        var code = '{', tab = '    ', prefixTab = prefix + tab;
+
+        var i = 0;
+        for (var key in definition) {
+            if (!definition[key])
+                continue;
+
+            code += (i++ === 0) ? '\n' : ',\n';
+
+            switch (key) {
+                case 'children':
+                    code += prefixTab + 'children: [';
+
+                    for (var i = 0; i < definition.children.length; ++i) {
+                        if (i > 0)
+                            code += ', ';
+
+                        code += structToCode(definition.children[i], prefixTab);
+                    }
+                    break;
+
+                case 'child':
+                    code += prefixTab + 'child: ' + structToCode(definition.child, prefixTab);
+                    break;
+
+                case 'action':
+                    var params = [];
+                    if ('child' in definition) {
+                        params = [definition.child.param];
+                    } else if ('children' in definition) {
+                        for (var i = 0; i < definition.children.length; ++i) {
+                            var child = definition.children[i];
+                            if (child.param)
+                                params.push(child.param);
+                        }
+                    }
+                    code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
+                    code += definition.action.replace(/^.*$/g, function (match) {
+                        return prefixTab + tab + match.trim() + '\n';
+                    });
+                    code += prefixTab + '}';
+                    break;
+
+                default:
+                    code += prefixTab + key + ': "' + definition[key] + '"';
+                    break;
+            }
+        }
+
+        code += '\n' + prefix + '}';
+        return code;
     }
 }

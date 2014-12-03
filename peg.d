@@ -8,6 +8,7 @@ Suffix <- Primary (QUESTION / STAR / PLUS)?
 Primary <- Identifier !LEFTARROW
 / OPEN Expression CLOSE
 / Literal / Class / DOT
+
 # Lexical syntax
 Identifier <- IdentStart IdentCont* Spacing
 IdentStart <- [a-zA-Z_]
