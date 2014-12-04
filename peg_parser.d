@@ -1,83 +1,141 @@
+#Prologue code
+{
+    // note: ranges are auto expanded in the set
+    var UNKNOWN = 'unknown',
+        DEFINITION = 'definition', // a -> b
+        SEQUENCE = 'sequence', // a b c
+        OR = 'or', // /
+        TEST = 'test', // &
+        OPTION = 'option', // ?
+        ATLEAST_ONE = 'at least one', // +
+        ZERO_OR_MORE = 'zero or more', // *
+        NOT = 'not', // !
+        LITERAL = 'literal', // 'x'
+        SET = 'set', // []
+        ANY_CHAR = 'any char'; // .
+
+    var stringToType = function(str) {
+        var i = '*+/?&!'.indexOf(str.trim());
+        if (i !== -1)
+            return [ZERO_OR_MORE, ATLEAST_ONE, OR, OPTION, TEST, NOT][i];
+
+        debugger; // unknown type
+        return UNKNOWN;
+    }
+
+    var define: any = {};
+    var outDefine: any = {};
+}
+
 # Hierarchical syntax
-Grammar <- Spacing Definition+ EndOfFile
+Grammar <- Spacing prologue:CodeBlock? definitions:Definition+ epilogue:CodeBlock? EndOfFile
+{
+    return {
+        prologue: prologue,
+        definitions: outDefine,
+        epilogue: epilogue
+    };
+}
 
 Definition <- identifier:Identifier LEFTARROW definition:Expression 
 { 
-	definition.debug = "'" + identifier + "'";
+    definition.debug = identifier;
 
-	define[identifier] = definition;
-	return definition;
+    outDefine[identifier] = definition;
+    return definition;
 }
 
-Expression <- first:Sequence rest:(SLASH Sequence)* 
+Expression <- first:Sequence rest:(SLASH part:Sequence {return part;})* 
 {
-	var defintion = {};
-	if (!rest) {
-		definition.type = SEQUENCE;
-		definition.children = [first];
-	} else {
-		definition.type = OR;
-		definition.children = [].concat.apply(first, rest);
-	}
-	return definition;
+    if (first && !rest)
+        return first;
+    else if (first && rest)
+        return {
+            type: OR,
+            children: [].concat.apply(first, rest)
+        };
 }
 
-Sequence <- Prefix*
 
-Prefix <- (and:AND / not:NOT)? child: Suffix
+Sequence <- children:(param:Parameter expression:Prefix { if (param) expression.param = param; return param; } )* action:CodeBlock?
 {
-	var type;
-	if (and)
-		type = AND;
-	else if (not)
-		type = NOT;
+    if (typeof children === 'undefined' || children.length === 0)
+        return undefined;
 
-	if (type)
-		return {type: type, child: child};
-	else 
-		return child;
+    var definition: any;
+    if (children.length === 1)
+        definition = children[0];
+    else
+        definition = {
+            type: SEQUENCE,
+            children: children
+        };
+
+    if (action)
+        definition.action = action;
+
+    return definition;
 }
 
-Suffix <- child:Primary (question:QUESTION / start:STAR / plus:PLUS)?
+Prefix <- option:(AND / NOT)? part:Suffix
 {
-	var type;
-	if (question)
-		type = OPTION;
-	else if (star)
-		type = ZERO_OR_MORE;
-	else if (plus)
-		type = ATLEAST_ONE;
+    if (option)
+        return {
+            type: stringToType(option),
+            child: part
+        };
+    else
+        return part;
+}
 
-	if (type)
-		return {type: type, child: child};
-	else
-		return child;
+Suffix <- part:Primary option:(QUESTION / STAR / PLUS)?
+{
+    if (option)
+        return {
+            type: stringToType(option),
+            child: part
+        };
+    else
+        return part;
 }
 
 Primary <- identifier:Identifier !LEFTARROW
 {
-	return {type: DEFINITION, defn: identifier};
+    return {
+        type: DEFINITION,
+        defn: identifier.trim()
+    };
 }
-/ OPEN Expression CLOSE
+/ OPEN expression:Expression CLOSE { return expression; }
 / Literal 
 / Class 
 / DOT
-{	
-	return {type: ANY_CHAR}; 
-}
 
 # Lexical syntax
-Identifier <- IdentStart IdentCont* Spacing
+Parameter <- param:Identifer ':' Spacing
+{
+    return param.trim();
+}
+
+CodeBlock <- '{' (CodeBlock / ![}] .)* '}' Spacing
+
+Identifier <- first:IdentStart rest:IdentCont* Spacing
+{
+    if (rest)
+        return first + rest;
+    else
+        return first;
+}
 IdentStart <- [a-zA-Z_]
 IdentCont <- IdentStart / [0-9]
 
-Literal <- ['] value:(!['] Char)* ['] Spacing
+Literal <- ['] chars:(!['] Char)* ['] Spacing
 {	
-	return {type: LITERAL, value: value}; 
+    return { type: LITERAL, value: chars };
 }
-/ ["] value:(!["] Char)* ["] Spacing
+/ ["] chars:(!["] Char)* ["] Spacing
 {	
-	return {type: LITERAL, value: value}; 
+    return { type: LITERAL, value: chars };
 }
 
 Class <- '[' chars:(!']' Range)* ']' Spacing
@@ -88,14 +146,11 @@ Class <- '[' chars:(!']' Range)* ']' Spacing
 Range <- a:Char '-' b:Char 
 { 	
 	var str = '';
-	for (i = a.charCodeAt(0); i < b.charCodeAt(0); ++i)
+	for (var i = a.charCodeAt(0); i < b.charCodeAt(0); ++i)
 		str += String.fromCharCode(i);
 	return str;
 }
 / c:Char 
-{	
-	return c; 
-}
 
 Char <- '\\' [nrt'"\[\]\\]
 / '\\' [0-2][0-7][0-7]
@@ -110,9 +165,14 @@ STAR <- '*' Spacing
 PLUS <- '+' Spacing
 OPEN <- '(' Spacing
 CLOSE <- ')' Spacing
-DOT <- '.' Spacing
+DOT <- '.' Spacing { return { type: ANY_CHAR }; }
 Spacing <- (Space / Comment)*
-Comment <- '#' (!EndOfLine .)* EndOfLine
+Comment <- '#' (!EndOfLine .)* EndOfLine { return ''; }
 Space <- ' ' / '\t' / EndOfLine
 EndOfLine <- '\r\n' / '\n' / '\r'
-EndOfFile <- !.
+EndOfFile <- !. {}
+
+#Epilogue code
+{
+    // this is a test
+}
