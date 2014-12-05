@@ -1,40 +1,137 @@
 #Prologue code
 {
-    // note: ranges are auto expanded in the set
-    var UNKNOWN = 'unknown',
-        DEFINITION = 'definition', // a -> b
-        SEQUENCE = 'sequence', // a b c
-        OR = 'or', // /
-        TEST = 'test', // &
-        OPTION = 'option', // ?
-        ATLEAST_ONE = 'at least one', // +
-        ZERO_OR_MORE = 'zero or more', // *
-        NOT = 'not', // !
-        LITERAL = 'literal', // 'x'
-        SET = 'set', // []
-        ANY_CHAR = 'any char'; // .
+    var outDefine = {},
+        tab = '    ';
+
+    // called at the beginning of every PEGParser.parse()
+    define.parse = function() {
+        outDefine = {};
+    }
 
     var stringToType = function(str) {
         var i = '*+/?&!'.indexOf(str.trim());
         if (i !== -1)
-            return [ZERO_OR_MORE, ATLEAST_ONE, OR, OPTION, TEST, NOT][i];
+            return ['zero or more', 'at least one', 'or', 'option', 'test', 'not'][i];
 
         debugger; // unknown type
-        return UNKNOWN;
+        return 'unknown';
     }
 
-    var define: any = {};
-    var outDefine: any = {};
+    function resultsToCode(results) {
+        var code = '(function(window) {\n';
+
+        var name = results.name;
+
+        code += tab + 'var define = {};\n\n';
+
+        if (results.prologue) {
+            code += '// PROLOGUE';
+            code += results.prologue;
+        }
+
+        for (var k in results.definitions) {
+            code += tab + 'define.' + name + '$' + k + ' = ';
+            code += structToCode(name, results.definitions[k], tab) + '\n\n';
+        }
+
+        if (results.epilogue)
+            code += results.epilogue;
+
+        code += tab + 'if (typeof module !== \'undefined\') {\n';
+        code += tab + tab + 'module.exports = define; // commonjs\n';
+        code += tab + '} else {\n';
+        code += tab + tab + 'window.' + name + ' = {}; // html <script>\n';
+        code += tab + tab + 'window.' + name + '.define = define;\n';
+        code += tab + '}\n';
+
+        code += '})(window);\n';
+
+        return code;
+    }
+
+    // outputs a string of formatted code
+    function structToCode(name, definition, prefix) {
+        if (typeof prefix === 'undefined')
+            prefix = '';
+
+        var code = '{',
+            prefixTab = prefix + tab;
+
+        var i = 0;
+        for (var key in definition) {
+            if (!definition[key])
+                continue; // parameter should never be undefined
+
+            code += (i++ === 0) ? '\n' : ',\n';
+
+            switch (key) {
+                case 'defn':
+                    // definitions are in the form [<grammar>$]<defn>
+                    var defn = definition[key];
+                    if (defn.indexOf('$') === -1)
+                        defn = name + '$' + defn; // prepend <grammar>$
+
+                    code += prefixTab + key + ': "' + defn + '"';
+                    break;
+
+                case 'children':
+                    code += prefixTab + 'children: [';
+
+                    for (var i = 0; i < definition.children.length; ++i) {
+                        if (i > 0)
+                            code += ', ';
+
+                        code += structToCode(name, definition.children[i], prefixTab);
+                    }
+                    code += ']';
+                    break;
+
+                case 'child':
+                    code += prefixTab + 'child: ' + structToCode(name, definition.child, prefixTab);
+                    break;
+
+                case 'action':
+                    var params = [];
+                    if ('child' in definition) {
+                        params = [definition.child.param];
+                    } else if ('children' in definition) {
+                        for (var i = 0; i < definition.children.length; ++i) {
+                            var child = definition.children[i];
+                            if (child.param)
+                                params.push(child.param);
+                        }
+                    }
+                    code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
+                    code += definition.action.replace(/^.*$/gm, function(match) {
+                        return prefixTab + tab + match
+                    });
+                    code += '\n' + prefixTab + '}';
+                    break;
+
+                default:
+                    code += prefixTab + key + ': "' + definition[key] + '"';
+                    break;
+            }
+        }
+
+        code += '\n' + prefix + '}';
+        return code;
+    }
 }
 
 # Hierarchical syntax
-Grammar <- Spacing prologue:CodeBlock? definitions:Definition+ epilogue:CodeBlock? EndOfFile
+peg <- Spacing prologue:CodeBlock? definitions:Definition+ epilogue:CodeBlock? EndOfFile
 {
-    return {
+    var names = Object.keys(outDefine);
+    if (names.length === 0)
+        return undefined; // no definitions
+
+    return resultsToCode({
+        name: names[0],
         prologue: prologue,
         definitions: outDefine,
         epilogue: epilogue
-    };
+    });
 }
 
 Definition <- identifier:Identifier LEFTARROW definition:Expression 
@@ -51,28 +148,29 @@ Expression <- first:Sequence rest:(SLASH part:Sequence {return part;})*
         return first;
     else if (first && rest)
         return {
-            type: OR,
+            type: 'or',
             children: [].concat.apply(first, rest)
         };
 }
 
 
-Sequence <- children:(param:Parameter expression:Prefix { if (param) expression.param = param; return param; } )* action:CodeBlock?
+Sequence <- children:(param:Parameter? expression:Prefix { if (param) expression.param = param; return expression; } )* action:CodeBlock?
 {
     if (typeof children === 'undefined' || children.length === 0)
         return undefined;
 
-    var definition: any;
+    var definition;
     if (children.length === 1)
         definition = children[0];
     else
         definition = {
-            type: SEQUENCE,
+            type: 'SEQUENCE',
             children: children
         };
 
-    if (action)
-        definition.action = action;
+    var trimmedAction = action ? action.trim() : '';
+    if (trimmedAction)
+        definition.action = trimmedAction;
 
     return definition;
 }
@@ -102,7 +200,7 @@ Suffix <- part:Primary option:(QUESTION / STAR / PLUS)?
 Primary <- identifier:Identifier !LEFTARROW
 {
     return {
-        type: DEFINITION,
+        type: 'definition',
         defn: identifier.trim()
     };
 }
@@ -112,12 +210,18 @@ Primary <- identifier:Identifier !LEFTARROW
 / DOT
 
 # Lexical syntax
-Parameter <- param:Identifer ':' Spacing
+Parameter <- param:Identifier ':' Spacing
 {
     return param.trim();
 }
 
-CodeBlock <- '{' (CodeBlock / ![}] .)* '}' Spacing
+CodeBlock <- '{' codeparts:(NestedCodeBlock / ![}] .)* '}' Spacing
+{
+    return codeparts;
+}
+
+NestedCodeBlock <- '{' (NestedCodeBlock / ![}] .)* '}' Spacing
+
 
 Identifier <- first:IdentStart rest:IdentCont* Spacing
 {
@@ -131,16 +235,16 @@ IdentCont <- IdentStart / [0-9]
 
 Literal <- ['] chars:(!['] Char)* ['] Spacing
 {	
-    return { type: LITERAL, value: chars };
+    return { type: 'literal', value: chars.replace(/"/g, "\\\"") };
 }
 / ["] chars:(!["] Char)* ["] Spacing
 {	
-    return { type: LITERAL, value: chars };
+    return { type: 'set', value: chars.replace(/"/g, "\\\"") };
 }
 
 Class <- '[' chars:(!']' Range)* ']' Spacing
 {	
-	return {type: SET, chars: chars}; 
+	return {type: 'set', chars: chars.replace(/"/g, "\\\"")}; 
 }
 
 Range <- a:Char '-' b:Char 
@@ -150,7 +254,7 @@ Range <- a:Char '-' b:Char
 		str += String.fromCharCode(i);
 	return str;
 }
-/ c:Char 
+/ Char 
 
 Char <- '\\' [nrt'"\[\]\\]
 / '\\' [0-2][0-7][0-7]
@@ -165,14 +269,13 @@ STAR <- '*' Spacing
 PLUS <- '+' Spacing
 OPEN <- '(' Spacing
 CLOSE <- ')' Spacing
-DOT <- '.' Spacing { return { type: ANY_CHAR }; }
+DOT <- '.' Spacing { return { type: 'any char' }; }
 Spacing <- (Space / Comment)*
-Comment <- '#' (!EndOfLine .)* EndOfLine { return ''; }
+Comment <- '#' (!EndOfLine .)* EndOfLine { return ''; // no comments in output }
 Space <- ' ' / '\t' / EndOfLine
 EndOfLine <- '\r\n' / '\n' / '\r'
-EndOfFile <- !. {}
+EndOfFile <- !. {} # empty action is needed so that the epilogue is not used as this action
 
 #Epilogue code
 {
-    // this is a test
 }

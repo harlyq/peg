@@ -1,25 +1,161 @@
-function peg(str) {
-    if (typeof str !== 'string')
-        return 'error: input parameter is not a string - ' + str;
-
-    if (str.length === 0)
-        return 'error: input string is empty';
-
-    // note: ranges are auto expanded in the set
+(function (window) {
     var UNKNOWN = 'unknown', DEFINITION = 'definition', SEQUENCE = 'sequence', OR = 'or', TEST = 'test', OPTION = 'option', ATLEAST_ONE = 'at least one', ZERO_OR_MORE = 'zero or more', NOT = 'not', LITERAL = 'literal', SET = 'set', ANY_CHAR = 'any char';
+
+    var outDefine = {};
+
+    var tab = '    ';
 
     var stringToType = function (str) {
         var i = '*+/?&!'.indexOf(str.trim());
         if (i !== -1)
-            return [ZERO_OR_MORE, ATLEAST_ONE, OR, OPTION, TEST, NOT][i];
+            return ['zero or more', 'at least one', 'or', 'option', 'test', 'not'][i];
 
         debugger;
         return UNKNOWN;
     };
 
-    var outDefine = {};
+    function resultsToCode(results) {
+        var code = '(function(window) {\n';
+
+        var name = results.name;
+
+        code += tab + 'var define = {};\n\n';
+
+        if (results.prologue)
+            code += results.prologue;
+
+        for (var k in results.definitions) {
+            code += tab + 'define.' + name + '$' + k + ' = ';
+            code += structToCode(name, results.definitions[k], tab) + '\n\n';
+        }
+
+        if (results.epilogue)
+            code += results.epilogue;
+
+        code += tab + 'if (typeof module !== \'undefined\') {\n';
+        code += tab + tab + 'module.exports = define; // commonjs\n';
+        code += tab + '} else {\n';
+        code += tab + tab + 'window.' + name + ' = {}; // html <script>\n';
+        code += tab + tab + 'window.' + name + '.define = define;\n';
+        code += tab + '}\n';
+
+        code += '})(window);\n';
+
+        return code;
+    }
+
+    // outputs a string of formatted code
+    function structToCode(name, definition, prefix) {
+        if (typeof prefix === "undefined") { prefix = ''; }
+        var code = '{', prefixTab = prefix + tab;
+
+        var i = 0;
+        for (var key in definition) {
+            if (!definition[key])
+                continue;
+
+            code += (i++ === 0) ? '\n' : ',\n';
+
+            switch (key) {
+                case 'defn':
+                    // definitions are in the form [<grammar>$]<defn>
+                    var defn = definition[key];
+                    if (defn.indexOf('$') === -1)
+                        defn = name + '$' + defn; // prepend <grammar>$
+
+                    code += prefixTab + key + ': "' + defn + '"';
+                    break;
+
+                case 'children':
+                    code += prefixTab + 'children: [';
+
+                    for (var i = 0; i < definition.children.length; ++i) {
+                        if (i > 0)
+                            code += ', ';
+
+                        code += structToCode(name, definition.children[i], prefixTab);
+                    }
+                    code += ']';
+                    break;
+
+                case 'child':
+                    code += prefixTab + 'child: ' + structToCode(name, definition.child, prefixTab);
+                    break;
+
+                case 'action':
+                    var params = [];
+                    if ('child' in definition) {
+                        params = [definition.child.param];
+                    } else if ('children' in definition) {
+                        for (var i = 0; i < definition.children.length; ++i) {
+                            var child = definition.children[i];
+                            if (child.param)
+                                params.push(child.param);
+                        }
+                    }
+                    code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
+                    code += definition.action.replace(/^.*$/gm, function (match) {
+                        return prefixTab + tab + match;
+                    });
+                    code += '\n' + prefixTab + '}';
+                    break;
+
+                default:
+                    code += prefixTab + key + ': "' + definition[key] + '"';
+                    break;
+            }
+        }
+
+        code += '\n' + prefix + '}';
+        return code;
+    }
 
     var define = {};
+
+    define.peg$Grammar = {
+        type: SEQUENCE,
+        debug: 'Grammar',
+        children: [
+            {
+                type: DEFINITION,
+                defn: 'peg$Spacing'
+            }, {
+                type: OPTION,
+                param: 'prologue',
+                child: {
+                    type: DEFINITION,
+                    defn: 'peg$CodeBlock'
+                }
+            }, {
+                type: ATLEAST_ONE,
+                child: {
+                    type: DEFINITION,
+                    defn: 'peg$Definition'
+                }
+            }, {
+                type: OPTION,
+                param: 'epilogue',
+                child: {
+                    type: DEFINITION,
+                    defn: 'peg$CodeBlock'
+                }
+            }, {
+                type: DEFINITION,
+                defn: 'peg$EndOfFile'
+            }],
+        action: function (prologue, epilogue) {
+            var names = Object.keys(outDefine);
+            if (names.length === 0)
+                return undefined;
+
+            return resultsToCode({
+                name: names[0],
+                prologue: prologue,
+                definitions: outDefine,
+                epilogue: epilogue
+            });
+        }
+    };
 
     define.peg$EndOfFile = {
         type: SEQUENCE,
@@ -72,7 +208,7 @@ function peg(str) {
                         value: '\t'
                     }, {
                         type: DEFINITION,
-                        defn: 'EndOfLine'
+                        defn: 'peg$EndOfLine'
                     }]
             }]
     };
@@ -93,7 +229,7 @@ function peg(str) {
                             type: NOT,
                             child: {
                                 type: DEFINITION,
-                                defn: 'EndOfLine'
+                                defn: 'peg$EndOfLine'
                             }
                         }, {
                             type: ANY_CHAR
@@ -101,7 +237,7 @@ function peg(str) {
                 }
             }, {
                 type: DEFINITION,
-                defn: 'EndOfLine'
+                defn: 'peg$EndOfLine'
             }],
         action: function () {
             return '';
@@ -116,10 +252,10 @@ function peg(str) {
             children: [
                 {
                     type: DEFINITION,
-                    defn: 'Space'
+                    defn: 'peg$Space'
                 }, {
                     type: DEFINITION,
-                    defn: 'Comment'
+                    defn: 'peg$Comment'
                 }]
         }
     };
@@ -133,7 +269,7 @@ function peg(str) {
                 value: '.'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }],
         action: function () {
             return {
@@ -152,7 +288,7 @@ function peg(str) {
                 value: ')'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -166,7 +302,7 @@ function peg(str) {
                 value: '('
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -179,7 +315,7 @@ function peg(str) {
                 value: '+'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -192,7 +328,7 @@ function peg(str) {
                 value: '*'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -205,7 +341,7 @@ function peg(str) {
                 value: '?'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -218,7 +354,7 @@ function peg(str) {
                 value: '!'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -231,7 +367,7 @@ function peg(str) {
                 value: '&'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -245,7 +381,7 @@ function peg(str) {
                 value: '/'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -259,7 +395,7 @@ function peg(str) {
                 value: '<-'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -334,14 +470,14 @@ function peg(str) {
                     {
                         type: DEFINITION,
                         param: 'start',
-                        defn: 'Char'
+                        defn: 'peg$Char'
                     }, {
                         type: LITERAL,
                         value: '-'
                     }, {
                         type: DEFINITION,
                         param: 'end',
-                        defn: 'Char'
+                        defn: 'peg$Char'
                     }],
                 action: function (start, end) {
                     // expand the range
@@ -352,7 +488,7 @@ function peg(str) {
                 }
             }, {
                 type: DEFINITION,
-                defn: 'Char'
+                defn: 'peg$Char'
             }]
     };
 
@@ -377,7 +513,7 @@ function peg(str) {
                             }
                         }, {
                             type: DEFINITION,
-                            defn: 'Range'
+                            defn: 'peg$Range'
                         }]
                 }
             }, {
@@ -385,7 +521,7 @@ function peg(str) {
                 value: ']'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }],
         action: function (chars) {
             return {
@@ -419,7 +555,7 @@ function peg(str) {
                                     }
                                 }, {
                                     type: DEFINITION,
-                                    defn: 'Char'
+                                    defn: 'peg$Char'
                                 }]
                         }
                     }, {
@@ -428,7 +564,7 @@ function peg(str) {
                         value: '\''
                     }, {
                         type: DEFINITION,
-                        defn: 'Spacing'
+                        defn: 'peg$Spacing'
                     }],
                 action: function (chars) {
                     return {
@@ -456,7 +592,7 @@ function peg(str) {
                                     }
                                 }, {
                                     type: DEFINITION,
-                                    defn: 'Char'
+                                    defn: 'peg$Char'
                                 }]
                         }
                     }, {
@@ -465,7 +601,7 @@ function peg(str) {
                         value: '"'
                     }, {
                         type: DEFINITION,
-                        defn: 'Spacing'
+                        defn: 'peg$Spacing'
                     }],
                 action: function (chars) {
                     return {
@@ -488,7 +624,7 @@ function peg(str) {
         children: [
             {
                 type: DEFINITION,
-                defn: 'IdentStart'
+                defn: 'peg$IdentStart'
             }, {
                 type: SET,
                 chars: '0123456789'
@@ -502,17 +638,17 @@ function peg(str) {
             {
                 type: DEFINITION,
                 param: 'first',
-                defn: 'IdentStart'
+                defn: 'peg$IdentStart'
             }, {
                 type: ZERO_OR_MORE,
                 param: 'rest',
                 child: {
                     type: DEFINITION,
-                    defn: 'IdentCont'
+                    defn: 'peg$IdentCont'
                 }
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }],
         action: function (first, rest) {
             if (rest)
@@ -537,7 +673,7 @@ function peg(str) {
                     children: [
                         {
                             type: DEFINITION,
-                            defn: 'NestedCodeBlock'
+                            defn: 'peg$NestedCodeBlock'
                         }, {
                             type: SEQUENCE,
                             children: [
@@ -557,7 +693,7 @@ function peg(str) {
                 value: '}'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
@@ -576,7 +712,7 @@ function peg(str) {
                     children: [
                         {
                             type: DEFINITION,
-                            defn: 'NestedCodeBlock'
+                            defn: 'peg$NestedCodeBlock'
                         }, {
                             type: SEQUENCE,
                             children: [
@@ -596,7 +732,7 @@ function peg(str) {
                 value: '}'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }],
         action: function (codeparts) {
             return codeparts;
@@ -610,13 +746,13 @@ function peg(str) {
             {
                 type: DEFINITION,
                 param: 'param',
-                defn: 'Identifier'
+                defn: 'peg$Identifier'
             }, {
                 type: LITERAL,
                 value: ':'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }],
         action: function (param) {
             return param.trim();
@@ -634,12 +770,12 @@ function peg(str) {
                     {
                         type: DEFINITION,
                         param: 'identifier',
-                        defn: 'Identifier'
+                        defn: 'peg$Identifier'
                     }, {
                         type: NOT,
                         child: {
                             type: DEFINITION,
-                            defn: 'LEFTARROW'
+                            defn: 'peg$LEFTARROW'
                         }
                     }],
                 action: function (identifier) {
@@ -653,27 +789,27 @@ function peg(str) {
                 children: [
                     {
                         type: DEFINITION,
-                        defn: 'OPEN'
+                        defn: 'peg$OPEN'
                     }, {
                         type: DEFINITION,
                         param: 'expression',
-                        defn: 'Expression'
+                        defn: 'peg$Expression'
                     }, {
                         type: DEFINITION,
-                        defn: 'CLOSE'
+                        defn: 'peg$CLOSE'
                     }],
                 action: function (expression) {
                     return expression;
                 }
             }, {
                 type: DEFINITION,
-                defn: 'Literal'
+                defn: 'peg$Literal'
             }, {
                 type: DEFINITION,
-                defn: 'Class'
+                defn: 'peg$Class'
             }, {
                 type: DEFINITION,
-                defn: 'DOT'
+                defn: 'peg$DOT'
             }]
     };
 
@@ -684,7 +820,7 @@ function peg(str) {
             {
                 type: DEFINITION,
                 param: 'part',
-                defn: 'Primary'
+                defn: 'peg$Primary'
             }, {
                 type: OPTION,
                 param: 'option',
@@ -693,13 +829,13 @@ function peg(str) {
                     children: [
                         {
                             type: DEFINITION,
-                            defn: 'QUESTION'
+                            defn: 'peg$QUESTION'
                         }, {
                             type: DEFINITION,
-                            defn: 'STAR'
+                            defn: 'peg$STAR'
                         }, {
                             type: DEFINITION,
-                            defn: 'PLUS'
+                            defn: 'peg$PLUS'
                         }]
                 }
             }],
@@ -726,16 +862,16 @@ function peg(str) {
                     children: [
                         {
                             type: DEFINITION,
-                            defn: 'AND'
+                            defn: 'peg$AND'
                         }, {
                             type: DEFINITION,
-                            defn: 'NOT'
+                            defn: 'peg$NOT'
                         }]
                 }
             }, {
                 type: DEFINITION,
                 param: 'part',
-                defn: 'Suffix'
+                defn: 'peg$Suffix'
             }],
         action: function (option, part) {
             if (option)
@@ -763,12 +899,12 @@ function peg(str) {
                             param: 'param',
                             child: {
                                 type: DEFINITION,
-                                defn: 'Parameter'
+                                defn: 'peg$Parameter'
                             }
                         }, {
                             type: DEFINITION,
                             param: 'expression',
-                            defn: 'Prefix'
+                            defn: 'peg$Prefix'
                         }],
                     action: function (param, expression) {
                         if (param)
@@ -782,7 +918,7 @@ function peg(str) {
                 param: 'action',
                 child: {
                     type: DEFINITION,
-                    defn: 'CodeBlock'
+                    defn: 'peg$CodeBlock'
                 }
             }],
         action: function (children, action) {
@@ -813,7 +949,7 @@ function peg(str) {
             {
                 type: DEFINITION,
                 param: 'first',
-                defn: 'Sequence'
+                defn: 'peg$Sequence'
             }, {
                 type: ZERO_OR_MORE,
                 param: 'rest',
@@ -823,11 +959,11 @@ function peg(str) {
                     children: [
                         {
                             type: DEFINITION,
-                            defn: 'SLASH'
+                            defn: 'peg$SLASH'
                         }, {
                             type: DEFINITION,
                             param: 'part',
-                            defn: 'Sequence'
+                            defn: 'peg$Sequence'
                         }],
                     action: function (part) {
                         return part;
@@ -852,14 +988,14 @@ function peg(str) {
             {
                 type: DEFINITION,
                 param: 'identifier',
-                defn: 'Identifier'
+                defn: 'peg$Identifier'
             }, {
                 type: DEFINITION,
-                defn: 'LEFTARROW'
+                defn: 'peg$LEFTARROW'
             }, {
                 type: DEFINITION,
                 param: 'definition',
-                defn: 'Expression'
+                defn: 'peg$Expression'
             }],
         action: function (identifier, definition) {
             definition.debug = identifier;
@@ -875,336 +1011,22 @@ function peg(str) {
         children: [
             {
                 type: DEFINITION,
-                defn: 'CodeBlock'
+                defn: 'peg$CodeBlock'
             }, {
                 type: DEFINITION,
-                defn: 'Spacing'
+                defn: 'peg$Spacing'
             }]
     };
 
-    define.peg$Grammar = {
-        type: SEQUENCE,
-        debug: 'Grammar',
-        children: [
-            {
-                type: DEFINITION,
-                defn: 'Spacing'
-            }, {
-                type: OPTION,
-                param: 'prologue',
-                child: {
-                    type: DEFINITION,
-                    defn: 'CodeBlock'
-                }
-            }, {
-                type: ATLEAST_ONE,
-                child: {
-                    type: DEFINITION,
-                    defn: 'Definition'
-                }
-            }, {
-                type: OPTION,
-                param: 'epilogue',
-                child: {
-                    type: DEFINITION,
-                    defn: 'CodeBlock'
-                }
-            }, {
-                type: DEFINITION,
-                defn: 'EndOfFile'
-            }],
-        action: function (prologue, epilogue) {
-            return {
-                prologue: prologue,
-                definitions: outDefine,
-                epilogue: epilogue
-            };
-        }
+    // called at the beginning of every PEGParser.parse()
+    define.parse = function () {
+        outDefine = {};
     };
 
-    var best = 0, bestError = '', options = {
-        verbose: false
-    };
-
-    function applyParams(definition, params, results) {
-        if (typeof definition.action === 'function') {
-            return definition.action.apply(this, params);
-        } else {
-            var isStringArray = Array.isArray(results);
-            for (var i = 0; isStringArray && i < results.length; ++i)
-                isStringArray = typeof results[i] === 'string';
-
-            return isStringArray ? results.join('') : results;
-        }
-    }
-
-    function parse(str, i, definition) {
-        var debugStr = str.substr(i, 20);
-
-        if (!definition)
-            debugger;
-
-        if (!('type' in definition))
-            debugger;
-
-        if (options.verbose)
-            console.log(definition.debug);
-
-        if (definition.breakpoint)
-            debugger;
-
-        var info;
-
-        switch (definition.type) {
-            case DEFINITION:
-                var childDefinition = define['peg$' + definition.defn];
-                info = parse(str, i, childDefinition);
-                break;
-
-            case SEQUENCE:
-                var j = i;
-                var result, params = [];
-
-                for (var k = 0; k < definition.children.length; ++k) {
-                    var childDefinition = definition.children[k];
-                    var childInfo = parse(str, j, childDefinition);
-
-                    if (!childInfo)
-                        break;
-
-                    // always push params, even when undefined, as order must be maintained
-                    if (childDefinition.param)
-                        params.push(childInfo.result);
-
-                    j = childInfo.end;
-                    if (childInfo.result) {
-                        if (!result)
-                            result = [];
-
-                        result.push(childInfo.result);
-                    }
-                }
-
-                if (k === definition.children.length)
-                    info = {
-                        start: i,
-                        end: j,
-                        result: applyParams(definition, params, result)
-                    };
-                break;
-
-            case OR:
-                for (var k = 0; k < definition.children.length; ++k) {
-                    var childInfo = parse(str, i, definition.children[k]);
-                    if (childInfo) {
-                        info = childInfo;
-                        break;
-                    }
-                }
-                break;
-
-            case TEST:
-                var childInfo = parse(str, i, definition.child);
-
-                if (childInfo)
-                    info = {
-                        start: i,
-                        end: i,
-                        result: childInfo.result
-                    };
-                break;
-
-            case OPTION:
-                var childInfo = parse(str, i, definition.child);
-
-                if (!childInfo)
-                    info = {
-                        start: i,
-                        end: i
-                    };
-                else
-                    info = childInfo;
-                break;
-
-            case ATLEAST_ONE:
-            case ZERO_OR_MORE:
-                var k = i, result, params = [], childDefinition = definition.child;
-
-                do {
-                    childInfo = parse(str, k, childDefinition);
-
-                    if (childInfo) {
-                        k = childInfo.end;
-                        if (!result)
-                            result = [];
-
-                        result.push(childInfo.result);
-                    }
-                } while(childInfo);
-
-                // each element in the params array represents a parameter, in this case there is
-                // only ever one parameter
-                if (childDefinition.param)
-                    params = [result];
-
-                if (k !== i || definition.type !== ATLEAST_ONE)
-                    info = {
-                        start: i,
-                        end: k,
-                        result: applyParams(definition, params, result)
-                    };
-                break;
-
-            case NOT:
-                var childInfo = parse(str, i, definition.child);
-                if (!childInfo)
-                    info = {
-                        start: i,
-                        end: i
-                    };
-                break;
-
-            case LITERAL:
-                var length = definition.value.length, literal = str.substr(i, length);
-
-                if (definition.value === literal)
-                    info = {
-                        start: i,
-                        end: i + length,
-                        result: literal
-                    };
-                break;
-
-            case SET:
-                var c = str[i];
-                if (c && definition.chars.indexOf(c) !== -1)
-                    info = {
-                        start: i,
-                        end: i + 1,
-                        result: c
-                    };
-                break;
-
-            case ANY_CHAR:
-                var c = str[i];
-                if (c)
-                    info = {
-                        start: i,
-                        end: i + 1,
-                        result: c
-                    };
-                break;
-
-            default:
-                info = "error - unknown definition - " + definition;
-        }
-
-        if (info) {
-            if (info.end > best) {
-                bestError = '';
-                best = info.end;
-            }
-        } else if (!bestError && definition.error) {
-            bestError = definition.error;
-        }
-
-        return info;
-    }
-
-    var tab = '    ';
-
-    function resultsToCode(results) {
-        var code = 'function peg() {\n';
-
-        if (results.prologue)
-            code += results.prologue;
-
-        for (var k in results.definitions) {
-            code += tab + 'define.peg$' + k + ' = ';
-            code += structToCode(results.definitions[k], tab) + '\n\n';
-        }
-
-        if (results.epilogue)
-            code += results.epilogue;
-
-        code += '}';
-
-        return code;
-    }
-
-    // outputs a string of formatted code
-    function structToCode(definition, prefix) {
-        if (typeof prefix === "undefined") { prefix = ''; }
-        var code = '{', prefixTab = prefix + tab;
-
-        var i = 0;
-        for (var key in definition) {
-            if (!definition[key])
-                continue;
-
-            // var trimmedAction = '';
-            // if (key === 'action') {
-            //     // removed trailing spaces, and the surrounding {}
-            //     trimmedAction = definition.action.trim();
-            //     trimmedAction = trimmedAction.substr(1, trimmedAction.length - 2).trim();
-            //     if (trimmedAction === '')
-            //         continue; // nothing in the action, ignore
-            // }
-            code += (i++ === 0) ? '\n' : ',\n';
-
-            switch (key) {
-                case 'children':
-                    code += prefixTab + 'children: [';
-
-                    for (var i = 0; i < definition.children.length; ++i) {
-                        if (i > 0)
-                            code += ', ';
-
-                        code += structToCode(definition.children[i], prefixTab);
-                    }
-                    code += ']';
-                    break;
-
-                case 'child':
-                    code += prefixTab + 'child: ' + structToCode(definition.child, prefixTab);
-                    break;
-
-                case 'action':
-                    var params = [];
-                    if ('child' in definition) {
-                        params = [definition.child.param];
-                    } else if ('children' in definition) {
-                        for (var i = 0; i < definition.children.length; ++i) {
-                            var child = definition.children[i];
-                            if (child.param)
-                                params.push(child.param);
-                        }
-                    }
-                    code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
-                    code += definition.action.replace(/^.*$/gm, function (match) {
-                        return prefixTab + tab + match;
-                    });
-                    code += '\n' + prefixTab + '}';
-                    break;
-
-                default:
-                    code += prefixTab + key + ': "' + definition[key] + '"';
-                    break;
-            }
-        }
-
-        code += '\n' + prefix + '}';
-        return code;
-    }
-
-    var initial = define.peg$Grammar;
-
-    var info = parse(str, 0, initial);
-    if (!info) {
-        console.log('Error at - ' + str.substr(0, best));
-        console.log(bestError);
-        debugger;
+    if (typeof module !== 'undefined') {
+        module.exports = define; // commonjs
     } else {
-        console.log(resultsToCode(info.result));
+        window.peg = {};
+        window.peg.define = define; // html <script>
     }
-}
+})(window);
