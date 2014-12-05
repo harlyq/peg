@@ -103,7 +103,7 @@
                     }
                     code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
                     code += definition.action.replace(/^.*$/gm, function(match) {
-                        return prefixTab + tab + match
+                        return prefixTab + tab + match;
                     });
                     code += '\n' + prefixTab + '}';
                     break;
