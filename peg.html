@@ -3,15 +3,21 @@
 
 <head>
     <script src="pegparser.js" type="text/javascript"></script>
-    <script src="peg.js" type="text/javascript"></script>
+    <script src="peg_to_javascript.js" type="text/javascript"></script>
     <script>
     window.addEventListener("load", function() {
+        var simpleGrammar = "\
+Comment <- '(*' comment:(Comment / ! '*)' .)* '*)' { return comment; } \n\
+Definition <- param: 'a' 'b' 'c' { return param; }";
+        var pegParser = PEGParser(peg_to_javascript.define);
+        console.log(pegParser.parse(simpleGrammar));
+
         var grammarElem = document.getElementById("grammar");
-        var myParser = PEGParser(peg.define);
+        var myParser = PEGParser(peg_to_javascript.define);
 
         document.getElementById("parse").addEventListener("click", function() {
             var results = myParser.parse(grammar.value);
-            console.log(results);
+            document.getElementById("output").value = results;
         });
 
         grammarElem.value = "\
@@ -26,6 +32,8 @@ Definition <- param: 'a' 'b' 'c' { return param; } \
     <textarea id="grammar" cols="60" rows="20"></textarea>
     <div></div>
     <button id="parse">Parse</button>
+    <div></div>
+    <textarea id="output" cols="60" rows="20"></textarea>
 </body>
 
 </html>

@@ -18,7 +18,7 @@
     }
 
     function resultsToCode(results) {
-        var code = '(function(window) {\n';
+        var code = '(function() {\n';
 
         var name = results.name;
 
@@ -44,7 +44,7 @@
         code += tab + tab + 'window.' + name + '.define = define;\n';
         code += tab + '}\n';
 
-        code += '})(window);\n';
+        code += '})();\n';
 
         return code;
     }
@@ -120,7 +120,7 @@
 }
 
 # Hierarchical syntax
-peg <- Spacing prologue:CodeBlock? definitions:Definition+ epilogue:CodeBlock? EndOfFile
+peg_to_javascript <- Spacing prologue:CodeBlock? definitions:Definition+ epilogue:CodeBlock? EndOfFile
 {
     var names = Object.keys(outDefine);
     if (names.length === 0)
@@ -164,7 +164,7 @@ Sequence <- children:(param:Parameter? expression:Prefix { if (param) expression
         definition = children[0];
     else
         definition = {
-            type: 'SEQUENCE',
+            type: 'sequence',
             children: children
         };
 

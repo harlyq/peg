@@ -26,7 +26,7 @@ interface PEGInfo {
     result: any;
 }
 
-(function(window) {
+(function() {
     function PEGParser(definitions ? : {
         [name: string]: PEGDefinition
     }) {
@@ -299,6 +299,6 @@ interface PEGInfo {
     if (typeof module !== 'undefined') {
         module.exports = parser; // commonjs
     } else {
-        window.PEGParser = parser; // html <script>
+        window['PEGParser'] = parser; // html <script>
     }
-})(window);
+})();

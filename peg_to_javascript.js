@@ -1,7 +1,7 @@
-(function(window) {
+(function() {
     var define = {};
 
-
+    // PROLOGUE
     var outDefine = {},
         tab = '    ';
 
@@ -20,7 +20,7 @@
     }
 
     function resultsToCode(results) {
-        var code = '(function(window) {\n';
+        var code = '(function() {\n';
 
         var name = results.name;
 
@@ -46,7 +46,7 @@
         code += tab + tab + 'window.' + name + '.define = define;\n';
         code += tab + '}\n';
 
-        code += '})(window);\n';
+        code += '})();\n';
 
         return code;
     }
@@ -105,7 +105,7 @@
                     }
                     code += prefixTab + 'action: function(' + params.join(',') + ') {\n';
                     code += definition.action.replace(/^.*$/gm, function(match) {
-                        return prefixTab + tab + match
+                        return prefixTab + tab + match;
                     });
                     code += '\n' + prefixTab + '}';
                     break;
@@ -119,35 +119,35 @@
         code += '\n' + prefix + '}';
         return code;
     }
-    define.peg$peg = {
+    define.peg_to_javascript$peg_to_javascript = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }, {
             type: "option",
             child: {
                 type: "definition",
-                defn: "peg$CodeBlock"
+                defn: "peg_to_javascript$CodeBlock"
             },
             param: "prologue"
         }, {
             type: "at least one",
             child: {
                 type: "definition",
-                defn: "peg$Definition"
+                defn: "peg_to_javascript$Definition"
             },
             param: "definitions"
         }, {
             type: "option",
             child: {
                 type: "definition",
-                defn: "peg$CodeBlock"
+                defn: "peg_to_javascript$CodeBlock"
             },
             param: "epilogue"
         }, {
             type: "definition",
-            defn: "peg$EndOfFile"
+            defn: "peg_to_javascript$EndOfFile"
         }],
         action: function(prologue, definitions, epilogue) {
             var names = Object.keys(outDefine);
@@ -161,21 +161,21 @@
                 epilogue: epilogue
             });
         },
-        debug: "peg"
+        debug: "peg_to_javascript"
     }
 
-    define.peg$Definition = {
+    define.peg_to_javascript$Definition = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$Identifier",
+            defn: "peg_to_javascript$Identifier",
             param: "identifier"
         }, {
             type: "definition",
-            defn: "peg$LEFTARROW"
+            defn: "peg_to_javascript$LEFTARROW"
         }, {
             type: "definition",
-            defn: "peg$Expression",
+            defn: "peg_to_javascript$Expression",
             param: "definition"
         }],
         action: function(identifier, definition) {
@@ -187,11 +187,11 @@
         debug: "Definition"
     }
 
-    define.peg$Expression = {
+    define.peg_to_javascript$Expression = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$Sequence",
+            defn: "peg_to_javascript$Sequence",
             param: "first"
         }, {
             type: "zero or more",
@@ -199,10 +199,10 @@
                 type: "sequence",
                 children: [{
                     type: "definition",
-                    defn: "peg$SLASH"
+                    defn: "peg_to_javascript$SLASH"
                 }, {
                     type: "definition",
-                    defn: "peg$Sequence",
+                    defn: "peg_to_javascript$Sequence",
                     param: "part"
                 }],
                 action: function(part) {
@@ -223,7 +223,7 @@
         debug: "Expression"
     }
 
-    define.peg$Sequence = {
+    define.peg_to_javascript$Sequence = {
         type: "sequence",
         children: [{
             type: "zero or more",
@@ -233,12 +233,12 @@
                     type: "option",
                     child: {
                         type: "definition",
-                        defn: "peg$Parameter"
+                        defn: "peg_to_javascript$Parameter"
                     },
                     param: "param"
                 }, {
                     type: "definition",
-                    defn: "peg$Prefix",
+                    defn: "peg_to_javascript$Prefix",
                     param: "expression"
                 }],
                 action: function(param, expression) {
@@ -251,7 +251,7 @@
             type: "option",
             child: {
                 type: "definition",
-                defn: "peg$CodeBlock"
+                defn: "peg_to_javascript$CodeBlock"
             },
             param: "action"
         }],
@@ -264,7 +264,7 @@
                 definition = children[0];
             else
                 definition = {
-                    type: 'SEQUENCE',
+                    type: 'sequence',
                     children: children
                 };
 
@@ -277,7 +277,7 @@
         debug: "Sequence"
     }
 
-    define.peg$Prefix = {
+    define.peg_to_javascript$Prefix = {
         type: "sequence",
         children: [{
             type: "option",
@@ -285,16 +285,16 @@
                 type: "or",
                 children: [{
                     type: "definition",
-                    defn: "peg$AND"
+                    defn: "peg_to_javascript$AND"
                 }, {
                     type: "definition",
-                    defn: "peg$NOT"
+                    defn: "peg_to_javascript$NOT"
                 }]
             },
             param: "option"
         }, {
             type: "definition",
-            defn: "peg$Suffix",
+            defn: "peg_to_javascript$Suffix",
             param: "part"
         }],
         action: function(option, part) {
@@ -309,11 +309,11 @@
         debug: "Prefix"
     }
 
-    define.peg$Suffix = {
+    define.peg_to_javascript$Suffix = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$Primary",
+            defn: "peg_to_javascript$Primary",
             param: "part"
         }, {
             type: "option",
@@ -321,13 +321,13 @@
                 type: "or",
                 children: [{
                     type: "definition",
-                    defn: "peg$QUESTION"
+                    defn: "peg_to_javascript$QUESTION"
                 }, {
                     type: "definition",
-                    defn: "peg$STAR"
+                    defn: "peg_to_javascript$STAR"
                 }, {
                     type: "definition",
-                    defn: "peg$PLUS"
+                    defn: "peg_to_javascript$PLUS"
                 }]
             },
             param: "option"
@@ -344,19 +344,19 @@
         debug: "Suffix"
     }
 
-    define.peg$Primary = {
+    define.peg_to_javascript$Primary = {
         type: "or",
         children: [{
             type: "sequence",
             children: [{
                 type: "definition",
-                defn: "peg$Identifier",
+                defn: "peg_to_javascript$Identifier",
                 param: "identifier"
             }, {
                 type: "not",
                 child: {
                     type: "definition",
-                    defn: "peg$LEFTARROW"
+                    defn: "peg_to_javascript$LEFTARROW"
                 }
             }],
             action: function(identifier) {
@@ -369,43 +369,43 @@
             type: "sequence",
             children: [{
                 type: "definition",
-                defn: "peg$OPEN"
+                defn: "peg_to_javascript$OPEN"
             }, {
                 type: "definition",
-                defn: "peg$Expression",
+                defn: "peg_to_javascript$Expression",
                 param: "expression"
             }, {
                 type: "definition",
-                defn: "peg$CLOSE"
+                defn: "peg_to_javascript$CLOSE"
             }],
             action: function(expression) {
                 return expression;
             }
         }, {
             type: "definition",
-            defn: "peg$Literal"
+            defn: "peg_to_javascript$Literal"
         }, {
             type: "definition",
-            defn: "peg$Class"
+            defn: "peg_to_javascript$Class"
         }, {
             type: "definition",
-            defn: "peg$DOT"
+            defn: "peg_to_javascript$DOT"
         }],
         debug: "Primary"
     }
 
-    define.peg$Parameter = {
+    define.peg_to_javascript$Parameter = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$Identifier",
+            defn: "peg_to_javascript$Identifier",
             param: "param"
         }, {
             type: "literal",
             value: ":"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         action: function(param) {
             return param.trim();
@@ -413,7 +413,7 @@
         debug: "Parameter"
     }
 
-    define.peg$CodeBlock = {
+    define.peg_to_javascript$CodeBlock = {
         type: "sequence",
         children: [{
             type: "literal",
@@ -424,7 +424,7 @@
                 type: "or",
                 children: [{
                     type: "definition",
-                    defn: "peg$NestedCodeBlock"
+                    defn: "peg_to_javascript$NestedCodeBlock"
                 }, {
                     type: "sequence",
                     children: [{
@@ -444,7 +444,7 @@
             value: "}"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         action: function(codeparts) {
             return codeparts;
@@ -452,7 +452,7 @@
         debug: "CodeBlock"
     }
 
-    define.peg$NestedCodeBlock = {
+    define.peg_to_javascript$NestedCodeBlock = {
         type: "sequence",
         children: [{
             type: "literal",
@@ -463,7 +463,7 @@
                 type: "or",
                 children: [{
                     type: "definition",
-                    defn: "peg$NestedCodeBlock"
+                    defn: "peg_to_javascript$NestedCodeBlock"
                 }, {
                     type: "sequence",
                     children: [{
@@ -482,27 +482,27 @@
             value: "}"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "NestedCodeBlock"
     }
 
-    define.peg$Identifier = {
+    define.peg_to_javascript$Identifier = {
         type: "sequence",
         children: [{
             type: "definition",
-            defn: "peg$IdentStart",
+            defn: "peg_to_javascript$IdentStart",
             param: "first"
         }, {
             type: "zero or more",
             child: {
                 type: "definition",
-                defn: "peg$IdentCont"
+                defn: "peg_to_javascript$IdentCont"
             },
             param: "rest"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         action: function(first, rest) {
             if (rest)
@@ -513,17 +513,17 @@
         debug: "Identifier"
     }
 
-    define.peg$IdentStart = {
+    define.peg_to_javascript$IdentStart = {
         type: "set",
         chars: "abcdefghijklmnopqrstuvwxyABCDEFGHIJKLMNOPQRSTUVWXY_",
         debug: "IdentStart"
     }
 
-    define.peg$IdentCont = {
+    define.peg_to_javascript$IdentCont = {
         type: "or",
         children: [{
             type: "definition",
-            defn: "peg$IdentStart"
+            defn: "peg_to_javascript$IdentStart"
         }, {
             type: "set",
             chars: "012345678"
@@ -531,7 +531,7 @@
         debug: "IdentCont"
     }
 
-    define.peg$Literal = {
+    define.peg_to_javascript$Literal = {
         type: "or",
         children: [{
             type: "sequence",
@@ -550,7 +550,7 @@
                         }
                     }, {
                         type: "definition",
-                        defn: "peg$Char"
+                        defn: "peg_to_javascript$Char"
                     }]
                 },
                 param: "chars"
@@ -559,7 +559,7 @@
                 chars: "'"
             }, {
                 type: "definition",
-                defn: "peg$Spacing"
+                defn: "peg_to_javascript$Spacing"
             }],
             action: function(chars) {
                 return {
@@ -584,7 +584,7 @@
                         }
                     }, {
                         type: "definition",
-                        defn: "peg$Char"
+                        defn: "peg_to_javascript$Char"
                     }]
                 },
                 param: "chars"
@@ -593,7 +593,7 @@
                 chars: "\""
             }, {
                 type: "definition",
-                defn: "peg$Spacing"
+                defn: "peg_to_javascript$Spacing"
             }],
             action: function(chars) {
                 return {
@@ -605,7 +605,7 @@
         debug: "Literal"
     }
 
-    define.peg$Class = {
+    define.peg_to_javascript$Class = {
         type: "sequence",
         children: [{
             type: "literal",
@@ -622,7 +622,7 @@
                     }
                 }, {
                     type: "definition",
-                    defn: "peg$Range"
+                    defn: "peg_to_javascript$Range"
                 }]
             },
             param: "chars"
@@ -631,7 +631,7 @@
             value: "]"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         action: function(chars) {
             return {
@@ -642,20 +642,20 @@
         debug: "Class"
     }
 
-    define.peg$Range = {
+    define.peg_to_javascript$Range = {
         type: "or",
         children: [{
             type: "sequence",
             children: [{
                 type: "definition",
-                defn: "peg$Char",
+                defn: "peg_to_javascript$Char",
                 param: "a"
             }, {
                 type: "literal",
                 value: "-"
             }, {
                 type: "definition",
-                defn: "peg$Char",
+                defn: "peg_to_javascript$Char",
                 param: "b"
             }],
             action: function(a, b) {
@@ -666,12 +666,12 @@
             }
         }, {
             type: "definition",
-            defn: "peg$Char"
+            defn: "peg_to_javascript$Char"
         }],
         debug: "Range"
     }
 
-    define.peg$Char = {
+    define.peg_to_javascript$Char = {
         type: "or",
         children: [{
             type: "sequence",
@@ -727,122 +727,122 @@
         debug: "Char"
     }
 
-    define.peg$LEFTARROW = {
+    define.peg_to_javascript$LEFTARROW = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "<-"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "LEFTARROW"
     }
 
-    define.peg$SLASH = {
+    define.peg_to_javascript$SLASH = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "/"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "SLASH"
     }
 
-    define.peg$AND = {
+    define.peg_to_javascript$AND = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "&"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "AND"
     }
 
-    define.peg$NOT = {
+    define.peg_to_javascript$NOT = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "!"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "NOT"
     }
 
-    define.peg$QUESTION = {
+    define.peg_to_javascript$QUESTION = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "?"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "QUESTION"
     }
 
-    define.peg$STAR = {
+    define.peg_to_javascript$STAR = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "*"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "STAR"
     }
 
-    define.peg$PLUS = {
+    define.peg_to_javascript$PLUS = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "+"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "PLUS"
     }
 
-    define.peg$OPEN = {
+    define.peg_to_javascript$OPEN = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "("
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "OPEN"
     }
 
-    define.peg$CLOSE = {
+    define.peg_to_javascript$CLOSE = {
         type: "sequence",
         children: [{
             type: "literal",
             value: ")"
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         debug: "CLOSE"
     }
 
-    define.peg$DOT = {
+    define.peg_to_javascript$DOT = {
         type: "sequence",
         children: [{
             type: "literal",
             value: "."
         }, {
             type: "definition",
-            defn: "peg$Spacing"
+            defn: "peg_to_javascript$Spacing"
         }],
         action: function() {
             return {
@@ -852,22 +852,22 @@
         debug: "DOT"
     }
 
-    define.peg$Spacing = {
+    define.peg_to_javascript$Spacing = {
         type: "zero or more",
         child: {
             type: "or",
             children: [{
                 type: "definition",
-                defn: "peg$Space"
+                defn: "peg_to_javascript$Space"
             }, {
                 type: "definition",
-                defn: "peg$Comment"
+                defn: "peg_to_javascript$Comment"
             }]
         },
         debug: "Spacing"
     }
 
-    define.peg$Comment = {
+    define.peg_to_javascript$Comment = {
         type: "sequence",
         children: [{
             type: "literal",
@@ -880,7 +880,7 @@
                     type: "not",
                     child: {
                         type: "definition",
-                        defn: "peg$EndOfLine"
+                        defn: "peg_to_javascript$EndOfLine"
                     }
                 }, {
                     type: "any char"
@@ -888,7 +888,7 @@
             }
         }, {
             type: "definition",
-            defn: "peg$EndOfLine"
+            defn: "peg_to_javascript$EndOfLine"
         }],
         action: function() {
             return ''; // no comments in output
@@ -896,7 +896,7 @@
         debug: "Comment"
     }
 
-    define.peg$Space = {
+    define.peg_to_javascript$Space = {
         type: "or",
         children: [{
             type: "literal",
@@ -906,12 +906,12 @@
             value: "\t"
         }, {
             type: "definition",
-            defn: "peg$EndOfLine"
+            defn: "peg_to_javascript$EndOfLine"
         }],
         debug: "Space"
     }
 
-    define.peg$EndOfLine = {
+    define.peg_to_javascript$EndOfLine = {
         type: "or",
         children: [{
             type: "literal",
@@ -926,7 +926,7 @@
         debug: "EndOfLine"
     }
 
-    define.peg$EndOfFile = {
+    define.peg_to_javascript$EndOfFile = {
         type: "not",
         child: {
             type: "any char"
@@ -938,7 +938,7 @@
     if (typeof module !== 'undefined') {
         module.exports = define; // commonjs
     } else {
-        window.peg = {}; // html <script>
-        window.peg.define = define;
+        window.peg_to_javascript = {}; // html <script>
+        window.peg_to_javascript.define = define;
     }
-})(window);
+})();

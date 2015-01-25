@@ -1,4 +1,4 @@
-(function (window) {
+(function () {
     function PEGParser(definitions) {
         this.define = {};
         this.options = {
@@ -262,6 +262,6 @@
     if (typeof module !== 'undefined') {
         module.exports = parser; // commonjs
     } else {
-        window.PEGParser = parser; // html <script>
+        window['PEGParser'] = parser; // html <script>
     }
-})(window);
+})();
